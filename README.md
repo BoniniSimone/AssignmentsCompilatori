@@ -2,8 +2,6 @@
 
 # Indice
 
-- [Assignments](#assignments)
-- [Indice](#indice)
 - [Configurazione enviroment](#configurazione-enviroment)
 - [Come compilare Asgn.cpp](#come-compilare-asgncpp)
 - [Assignment 1](#assignment-1)
