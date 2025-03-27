@@ -3,6 +3,7 @@
 # Indice
 
 - [Configurazione enviroment](#configurazione-enviroment)
+- [Ricavare l'IR](#ricavare-lir)
 - [Come compilare Asgn.cpp](#come-compilare-asgncpp)
 - [Assignment 1](#assignment-1)
 
@@ -15,6 +16,11 @@ export LLVM_DIR="/usr/lib/llvm-19/bin"
 export PATH = $LLVM_DIR : $PATH
 ```
 
+# Ricavare l'IR
+
+```bash
+clang –O2 –emit-llvm–S –c test/Loop.c –o test/Loop.ll
+```
 
 # Come compilare Asgn.cpp
 Abbiamo un file Asgn.cpp che deve diventare la nostra libreria .so che daremo come plugin a opt.
