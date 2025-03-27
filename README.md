@@ -36,6 +36,7 @@ Implementare tre passi LLVM che realizzano le seguenti ottimizzazioni:
 
 > 2. StrengthReduction(più avanzato)
 
+Effettuiamo strength reduction solo se il valore è o un multiplo di 8 o se è il suo predecessore o successore.
 15 ×𝑥= 𝑥×15 ⇒(𝑥≪4) –x  
 y = x / 8 ⇒y = x >> 3
 
