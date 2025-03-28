@@ -4,7 +4,8 @@
 
 - [Configurazione enviroment](#configurazione-enviroment)
 - [Ricavare l'IR](#ricavare-lir)
-- [Come compilare Asgn.cpp](#come-compilare-asgncpp)
+- [Compilare Asgn.cpp](#compilare-asgncpp)
+- [Ottimizzare](#ottimizzare)
 - [Assignment 1](#assignment-1)
 
 # Configurazione enviroment
@@ -13,16 +14,28 @@ Può essere che tali comandi siano irraggiungibili (testare con which opt). In t
 
 ```bash
 export LLVM_DIR="/usr/lib/llvm-19/bin"
-export PATH = $LLVM_DIR : $PATH
+export PATH=$LLVM_DIR:$PATH
 ```
 
 # Ricavare l'IR
+Questo è il metodo classico con il quale ricaviamo la rappresentazione intermedia:  
+clang –O2 –emit-llvm–S –c test/Loop.c –o test/Loop.ll  
+Per ricavare la rappresentazione intermedia, noi invece utiliziamo questo comando:
 
 ```bash
-clang –O2 –emit-llvm–S –c test/Loop.c –o test/Loop.ll
+clang -Xclang -disable-O0-optnone -emit-llvm -S -c <nome>.c -o <nome>.ll
+```
+Le ottimizzazioni normali hanno molte load e store, che non ci aiutano per rimuoverle eseguire anche questo comando:
+```bash
+opt -p mem2reg <nomeIR>.ll -o <nomeIRsenzaLoad>.ll
+```
+---
+*Se proviamo a leggere il file notiamo che non è leggibile perchè è in bitecode binario. Per renderlo leggibile eseguire il seguente comando:*
+```bash
+llvm-dis <fileNonLeggibile>.ll -o <leggibile>.ll
 ```
 
-# Come compilare Asgn.cpp
+# Compilare Asgn.cpp
 Abbiamo un file Asgn.cpp che deve diventare la nostra libreria .so che daremo come plugin a opt.
 Per fare questo si utilizzi il seguente comando:
 
@@ -30,6 +43,22 @@ Per fare questo si utilizzi il seguente comando:
 ```bash
 clang++ -fPIC -shared -o <nome>.so <nome>.cpp `llvm-config --cxxflags --ldflags --libs core` -std=c++17
 ```
+# Ottimizzare:
+Algebraic Identity:
+```bash
+opt -load-pass-plugin ./Asgn.so -passes=algebraic-id <nome>.ll –o <nome>.ll
+```
+
+Strength Reduction:
+```bash
+opt -load-pass-plugin ./Asgn.so -passes=strength-red <nome>.ll –o <nome>.ll
+```
+
+Multi-Instruction Optimization:
+```bash
+opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll –o <nome>.ll
+```
+
 
 
 # Assignment 1
