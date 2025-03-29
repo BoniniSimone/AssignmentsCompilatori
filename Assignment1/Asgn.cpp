@@ -1,5 +1,6 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -11,58 +12,125 @@ using namespace llvm::PatternMatch;
 
 namespace {
 
-//-----------------------------------------------------------------------------
-// Pass 1: AlgebraicIdentity
-// Riconosce: x + 0 = 0 + x e lo sostituisce con x
-// Riconosce: x * 1 = 1 * x e lo sostituisce con x
-//-----------------------------------------------------------------------------
-struct AlgebraicId : PassInfoMixin<AlgebraicId> {
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-    bool Changed = false;
-    for (auto &BB : F) {
-      // Utilizziamo un iteratore "safe" per poter eliminare le istruzioni
-      for (auto Inst = BB.begin(); Inst != BB.end(); ) {
-        Instruction *I = &*Inst++;
-        //Cosa fa per ogni istruzione?
-      }
-    }
-    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  bool isPowTwo(int x) {
+    return (x & (x - 1)) == 0;
   }
-};
 
-//-----------------------------------------------------------------------------
-// Pass 2: StrenghReduction
-// Riconosce: 15 * x e lo sostituisce con (x << 4) - x
-//-----------------------------------------------------------------------------
-struct StrengthRed : PassInfoMixin<StrengthRed> {
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-    bool Changed = false;
-    for (auto &BB : F) {
-      for (auto Inst = BB.begin(); Inst != BB.end(); ) {
-        Instruction *I = &*Inst++;
-        //Cosa fa per ogni istruzione?
+  //-----------------------------------------------------------------------------
+  // Pass 1: AlgebraicIdentity
+  // Riconosce: x + 0 = 0 + x e lo sostituisce con x
+  // Riconosce: x * 1 = 1 * x e lo sostituisce con x
+  //-----------------------------------------------------------------------------
+  struct AlgebraicId : PassInfoMixin<AlgebraicId> {
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+      bool Changed = false;
+      for (auto &BB : F) {
+        // Utilizziamo un iteratore "safe" per poter eliminare le istruzioni
+        for (auto Inst = BB.begin(); Inst != BB.end(); ) {
+          Instruction *I = &*Inst++;
+          //Cosa fa per ogni istruzione?
+        }
       }
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
-    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-  }
-};
+  };
 
-//-----------------------------------------------------------------------------
-// Pass 3: Multi-Instruction Optimization
-// Riconosce: a = b + 1, c = a - 1  e sostituisce c con b
-//-----------------------------------------------------------------------------
-struct MultiInsOpt : PassInfoMixin<MultiInsOpt> {
-  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-    bool Changed = false;
-    for (auto &BB : F) {
-      for (auto Inst = BB.begin(); Inst != BB.end(); ) {
-        Instruction *I = &*Inst++;
-        //Cosa fa per ogni istruzione?
+  //-----------------------------------------------------------------------------
+  // Pass 2: StrengthReduction
+  // Riconosce: 15 * x e lo sostituisce con (x << 4) - x
+  //-----------------------------------------------------------------------------
+  struct StrengthRed : PassInfoMixin<StrengthRed> {
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+      bool Changed = false;
+      for (auto &BB : F) {
+        for (auto Inst = BB.begin(); Inst != BB.end(); ) {
+          Instruction *I = &*Inst++;
+
+          //Verifica se l'istruzione è una moltiplicazione
+          if (auto *MulInst = dyn_cast<MulOperator>(I)) { 
+            IRBuilder<> Builder(cast<Instruction>(MulInst));   // Costruisce un IRBuilder per l'istruzione corrente (IRBuilder è un builder di istruzioni IR di LLVM)
+
+            // Otteniamo gli operandi
+            Value *Op1 = MulInst->getOperand(0);          //Moltiplicando
+            Value *Op2 = MulInst->getOperand(1);          //Moltiplicatore
+
+            ConstantInt *ConstOperand = nullptr;          //Valore costante
+            Value *VarOperand = nullptr;                  //Variabile
+
+            // Controlliamo se Op1 è costante e Op2 è variabile
+            if (auto *Op1Const = dyn_cast<ConstantInt>(Op1)) {
+                if (!isa<ConstantInt>(Op2)) {             // Assicuriamoci che Op2 non sia costante
+                    ConstOperand = Op1Const;
+                    VarOperand = Op2;
+                }
+            }
+            // Controlliamo se Op2 è costante e Op1 è variabile
+            else if (auto *Op2Const = dyn_cast<ConstantInt>(Op2)) {
+                if (!isa<ConstantInt>(Op1)) {             // Assicuriamoci che Op1 non sia costante
+                    ConstOperand = Op2Const;
+                    VarOperand = Op1;
+                }
+            }
+
+            // Procediamo solo se abbiamo trovato un costante intero e una variabile
+            if (ConstOperand && VarOperand) {
+                int ConstValue = ConstOperand->getSExtValue();
+                if (isPowTwo(ConstValue)) {
+                    // Sostituiamo la moltiplicazione con uno shift
+                    Value *Shifted = Builder.CreateShl(VarOperand, Log2_64(ConstValue)); //CreateShl(Operand1, Operand2) genera un'istruzione di shift a sinistra
+                    MulInst->replaceAllUsesWith(Shifted);
+                    cast<Instruction>(MulInst)->eraseFromParent();
+                    Changed = true;
+                }
+            }
+          }
+
+          // Verifica se l'istruzione è una divisione
+          else if (auto *BinOp = dyn_cast<BinaryOperator>(I)) {
+            if (BinOp->getOpcode() == Instruction::UDiv) {  // Controlla se l'operazione è una divisione Unsignes
+              IRBuilder<> Builder(cast<Instruction>(BinOp));
+      
+              // Otteniamo gli operandi:
+              Value *Dividendo = BinOp->getOperand(0);    //Dividendo
+              Value *Divisore = BinOp->getOperand(1);     //Divisore
+      
+              // Ottimizzare solo se il divisore è costante
+              if (auto *DivisorConst = dyn_cast<ConstantInt>(Divisore)) {
+                  if (!isa<ConstantInt>(Dividendo)) {     // Assicuriamoci che il dividendo non sia costante
+                      int ConstValue = DivisorConst->getSExtValue();
+                      if (isPowTwo(ConstValue)) {
+                          // Sostituiamo la divisione unsigned con uno shift a destra logico
+                          Value *Shifted = Builder.CreateLShr(Dividendo, Log2_64(ConstValue));
+                          BinOp->replaceAllUsesWith(Shifted);
+                          cast<Instruction>(BinOp)->eraseFromParent();
+                          Changed = true;
+                      }
+                  }
+              }
+            }
+          }
+        }
       }
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
-    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-  }
-};
+  };
+
+  //-----------------------------------------------------------------------------
+  // Pass 3: Multi-Instruction Optimization
+  // Riconosce: a = b + 1, c = a - 1  e sostituisce c con b
+  //-----------------------------------------------------------------------------
+  struct MultiInsOpt : PassInfoMixin<MultiInsOpt> {
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+      bool Changed = false;
+      for (auto &BB : F) {
+        for (auto Inst = BB.begin(); Inst != BB.end(); ) {
+          Instruction *I = &*Inst++;
+          //Cosa fa per ogni istruzione?
+        }
+      }
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
+  };
 
 } // end anonymous namespace
 
