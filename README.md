@@ -46,17 +46,17 @@ clang++ -fPIC -shared -o <nome>.so <nome>.cpp `llvm-config --cxxflags --ldflags 
 # Ottimizzare:
 Algebraic Identity:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=algebraic-id <nome>.ll –o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=algebraic-id <nome>.ll -o <nome>.ll
 ```
 
 Strength Reduction:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=strength-red <nome>.ll –o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=strength-red <nome>.ll -o <nome>.ll
 ```
 
 Multi-Instruction Optimization:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll –o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll -o <nome>.ll
 ```
 
 
