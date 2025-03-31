@@ -16,19 +16,68 @@ namespace {
 // Riconosce: x + 0 = 0 + x e lo sostituisce con x
 // Riconosce: x * 1 = 1 * x e lo sostituisce con x
 //-----------------------------------------------------------------------------
+//struct AlgebraicId : PassInfoMixin<AlgebraicId> {
+//  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+//    bool Changed = false;
+//    for (auto &BB : F) {
+      // Utilizziamo un iteratore "safe" per poter eliminare le istruzioni
+//      for (auto Inst = BB.begin(); Inst != BB.end(); ) {
+//        Instruction *I = &*Inst++;
+        //Cosa fa per ogni istruzione?
+//      }
+//    }
+//    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+//  }
+//};
 struct AlgebraicId : PassInfoMixin<AlgebraicId> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
     bool Changed = false;
     for (auto &BB : F) {
-      // Utilizziamo un iteratore "safe" per poter eliminare le istruzioni
+      // Iteratore "safe" per poter eliminare le istruzioni
       for (auto Inst = BB.begin(); Inst != BB.end(); ) {
         Instruction *I = &*Inst++;
-        //Cosa fa per ogni istruzione?
+        
+        // Consideriamo solo le operazioni binarie
+        if (auto *BinOp = dyn_cast<BinaryOperator>(I)) {
+          // Caso: addizione con zero (x + 0 oppure 0 + x)
+          if (BinOp->getOpcode() == Instruction::Add) {
+            Value *Op;
+            if (match(BinOp, m_Add(m_Value(Op), m_Zero()))) {
+              BinOp->replaceAllUsesWith(Op);
+              BinOp->eraseFromParent();
+              Changed = true;
+              continue;
+            }
+            if (match(BinOp, m_Add(m_Zero(), m_Value(Op)))) {
+              BinOp->replaceAllUsesWith(Op);
+              BinOp->eraseFromParent();
+              Changed = true;
+              continue;
+            }
+          }
+          // Caso: moltiplicazione per uno (x * 1 oppure 1 * x)
+          if (BinOp->getOpcode() == Instruction::Mul) {
+            Value *Op;
+            if (match(BinOp, m_Mul(m_Value(Op), m_One()))) {
+              BinOp->replaceAllUsesWith(Op);
+              BinOp->eraseFromParent();
+              Changed = true;
+              continue;
+            }
+            if (match(BinOp, m_Mul(m_One(), m_Value(Op)))) {
+              BinOp->replaceAllUsesWith(Op);
+              BinOp->eraseFromParent();
+              Changed = true;
+              continue;
+            }
+          }
+        }
       }
     }
     return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
   }
 };
+
 
 //-----------------------------------------------------------------------------
 // Pass 2: StrenghReduction
