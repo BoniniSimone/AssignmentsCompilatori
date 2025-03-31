@@ -13,7 +13,7 @@ using namespace llvm::PatternMatch;
 namespace {
 
   bool isPowTwo(int x) {
-    return (x & (x - 1)) == 0;
+    return x > 0 && (x & (x - 1)) == 0;
   }
 
   //-----------------------------------------------------------------------------
@@ -60,28 +60,44 @@ namespace {
             // Controlliamo se Op1 è costante e Op2 è variabile
             if (auto *Op1Const = dyn_cast<ConstantInt>(Op1)) {
                 if (!isa<ConstantInt>(Op2)) {             // Assicuriamoci che Op2 non sia costante
-                    ConstOperand = Op1Const;
-                    VarOperand = Op2;
+                  ConstOperand = Op1Const;
+                  VarOperand = Op2;
                 }
             }
             // Controlliamo se Op2 è costante e Op1 è variabile
             else if (auto *Op2Const = dyn_cast<ConstantInt>(Op2)) {
                 if (!isa<ConstantInt>(Op1)) {             // Assicuriamoci che Op1 non sia costante
-                    ConstOperand = Op2Const;
-                    VarOperand = Op1;
+                  ConstOperand = Op2Const;
+                  VarOperand = Op1;
                 }
             }
 
             // Procediamo solo se abbiamo trovato un costante intero e una variabile
             if (ConstOperand && VarOperand) {
-                int ConstValue = ConstOperand->getSExtValue();
-                if (isPowTwo(ConstValue)) {
-                    // Sostituiamo la moltiplicazione con uno shift
-                    Value *Shifted = Builder.CreateShl(VarOperand, Log2_64(ConstValue)); //CreateShl(Operand1, Operand2) genera un'istruzione di shift a sinistra
-                    MulInst->replaceAllUsesWith(Shifted);
-                    cast<Instruction>(MulInst)->eraseFromParent();
-                    Changed = true;
-                }
+              int ConstValue = ConstOperand->getSExtValue();
+              if (isPowTwo(ConstValue)) {
+                // Sostituiamo la moltiplicazione con uno shift
+                Value *Shifted = Builder.CreateShl(VarOperand, Log2_64(ConstValue)); //CreateShl(Operand1, Operand2) genera un'istruzione di shift a sinistra
+                MulInst->replaceAllUsesWith(Shifted);
+                cast<Instruction>(MulInst)->eraseFromParent();
+                Changed = true;
+              }
+              else if(isPowTwo(ConstValue+1)) {
+                // Sostituiamo la moltiplicazione con uno shift
+                Value *Shifted = Builder.CreateShl(VarOperand, Log2_64(ConstValue+1));
+                Value *Subtracted = Builder.CreateSub(Shifted, VarOperand);
+                MulInst->replaceAllUsesWith(Subtracted);
+                cast<Instruction>(MulInst)->eraseFromParent();
+                Changed = true;
+              }
+              else if (isPowTwo(ConstValue-1)){
+                // Sostituiamo la moltiplicazione con uno shift
+                Value *Shifted = Builder.CreateShl(VarOperand, Log2_64(ConstValue-1));
+                Value *Added = Builder.CreateAdd(Shifted, VarOperand);
+                MulInst->replaceAllUsesWith(Added);
+                cast<Instruction>(MulInst)->eraseFromParent();
+                Changed = true;
+              }
             }
           }
 
@@ -96,16 +112,16 @@ namespace {
       
               // Ottimizzare solo se il divisore è costante
               if (auto *DivisorConst = dyn_cast<ConstantInt>(Divisore)) {
-                  if (!isa<ConstantInt>(Dividendo)) {     // Assicuriamoci che il dividendo non sia costante
-                      int ConstValue = DivisorConst->getSExtValue();
-                      if (isPowTwo(ConstValue)) {
-                          // Sostituiamo la divisione unsigned con uno shift a destra logico
-                          Value *Shifted = Builder.CreateLShr(Dividendo, Log2_64(ConstValue));
-                          BinOp->replaceAllUsesWith(Shifted);
-                          cast<Instruction>(BinOp)->eraseFromParent();
-                          Changed = true;
-                      }
+                if (!isa<ConstantInt>(Dividendo)) {     // Assicuriamoci che il dividendo non sia costante
+                    int ConstValue = DivisorConst->getSExtValue();
+                  if (isPowTwo(ConstValue)) {
+                    // Sostituiamo la divisione unsigned con uno shift a destra logico
+                    Value *Shifted = Builder.CreateLShr(Dividendo, Log2_64(ConstValue));
+                    BinOp->replaceAllUsesWith(Shifted);
+                    cast<Instruction>(BinOp)->eraseFromParent();
+                    Changed = true;
                   }
+                }
               }
             }
           }
