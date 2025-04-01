@@ -16,45 +16,47 @@ namespace {
 // Riconosce: x + 0 = 0 + x e lo sostituisce con x
 // Riconosce: x * 1 = 1 * x e lo sostituisce con x
 //-----------------------------------------------------------------------------
-//struct AlgebraicId : PassInfoMixin<AlgebraicId> {
-//  PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-//    bool Changed = false;
-//    for (auto &BB : F) {
-      // Utilizziamo un iteratore "safe" per poter eliminare le istruzioni
-//      for (auto Inst = BB.begin(); Inst != BB.end(); ) {
-//        Instruction *I = &*Inst++;
-        //Cosa fa per ogni istruzione?
-//      }
-//    }
-//    return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-//  }
-//};
+// Pass 1: AlgebraicIdentity
+
+// La struttura AlgebraicId è un passaggio di ottimizzazione che implementa l'interfaccia PassInfoMixin.
 struct AlgebraicId : PassInfoMixin<AlgebraicId> {
+  
+  // Il metodo run è chiamato quando il passaggio viene eseguito. Prende come parametri
+  // una funzione F (la funzione da ottimizzare) e un FunctionAnalysisManager (gestisce le analisi della funzione).
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
-    bool Changed = false;
+    bool Changed = false;  // Variabile che tiene traccia se sono state fatte modifiche.
+
+    // Itera attraverso tutti i blocchi base della funzione.
     for (auto &BB : F) {
-      // Iteratore "safe" per poter eliminare le istruzioni
+      
+      // Iteratore per scorrere le istruzioni nel blocco base, per eliminare possibilmente istruzioni.
       for (auto Inst = BB.begin(); Inst != BB.end(); ) {
-        Instruction *I = &*Inst++;
+        Instruction *I = &*Inst++;  // Salva l'istruzione corrente e avanza l'iteratore.
         
-        // Consideriamo solo le operazioni binarie
+        // Considera solo operazioni binarie (Add, Mul, ecc.)
         if (auto *BinOp = dyn_cast<BinaryOperator>(I)) {
-          // Caso: addizione con zero (x + 0 oppure 0 + x)
+          
+          // Caso: addizione (x + 0 oppure 0 + x)
           if (BinOp->getOpcode() == Instruction::Add) {
-            Value *Op;
+            Value *Op;  // Variabile per contenere l'operando non nullo (x o 0).
+            x = x+0
+            // Controlla se l'operazione è una somma di un valore e zero (x + 0).
             if (match(BinOp, m_Add(m_Value(Op), m_Zero()))) {
-              BinOp->replaceAllUsesWith(Op);
-              BinOp->eraseFromParent();
-              Changed = true;
-              continue;
+              BinOp->replaceAllUsesWith(Op);  // Sostituisce tutte le occorrenze dell'istruzione con il valore Op (x).
+              BinOp->eraseFromParent();  // Elimina l'istruzione BinOp.
+              Changed = true; 
+              continue;  
             }
+            
+            // Controlla se l'operazione è una somma di zero e un valore (0 + x).
             if (match(BinOp, m_Add(m_Zero(), m_Value(Op)))) {
-              BinOp->replaceAllUsesWith(Op);
-              BinOp->eraseFromParent();
-              Changed = true;
-              continue;
+              BinOp->replaceAllUsesWith(Op);  
+              BinOp->eraseFromParent();  
+              Changed = true;  
+              continue;  
             }
           }
+          
           // Caso: moltiplicazione per uno (x * 1 oppure 1 * x)
           if (BinOp->getOpcode() == Instruction::Mul) {
             Value *Op;
