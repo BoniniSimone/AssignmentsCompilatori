@@ -39,7 +39,6 @@ struct AlgebraicId : PassInfoMixin<AlgebraicId> {
           // Caso: addizione (x + 0 oppure 0 + x)
           if (BinOp->getOpcode() == Instruction::Add) {
             Value *Op;  // Variabile per contenere l'operando non nullo (x o 0).
-            x = x+0
             // Controlla se l'operazione è una somma di un valore e zero (x + 0).
             if (match(BinOp, m_Add(m_Value(Op), m_Zero()))) {
               BinOp->replaceAllUsesWith(Op);  // Sostituisce tutte le occorrenze dell'istruzione con il valore Op (x).
