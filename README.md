@@ -59,6 +59,11 @@ Multi-Instruction Optimization:
 opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll -o <nome>.ll
 ```
 
+Tutti i passi insieme:
+```bash
+opt -load-pass-plugin ./Asgn.so -passes="algebraic-id,strength-red,multi-ins-opt" ./test/testR.ll -o ./test/testOpt.ll
+```
+
 
 
 # Assignment 1
