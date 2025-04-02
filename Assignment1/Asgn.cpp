@@ -52,7 +52,8 @@ struct StrengthRed : PassInfoMixin<StrengthRed> {
 // Riconosce: a = b + 1, c = a - 1  e sostituisce c con b
 //-----------------------------------------------------------------------------
 struct MultiInsOpt : public PassInfoMixin<MultiInsOpt> {
-  /// Funzione helper per ottenere la forma canonica (base, offset)
+
+  /// Funzione per ottenere la forma canonica (base, offset)
   std::pair<Value*, int64_t> getCanonicalForm(Value *V) {
     if (auto *BO = dyn_cast<BinaryOperator>(V)) {
       // Per l'addizione: la costante può essere il primo o il secondo operando.
@@ -79,25 +80,23 @@ struct MultiInsOpt : public PassInfoMixin<MultiInsOpt> {
 
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
     bool Changed = false;
-    // Mappa per memorizzare per ciascuna coppia (base, offset) il valore rappresentante.
-    DenseMap<std::pair<Value*, int64_t>, Value*> canonicalMap;
-    SmallVector<Instruction*, 8> ToRemove;
+
+    //canonicalMap memorizza ciascuna coppia (base, offset) come chiave e l'istruzione rappresentante. es: a=b+15 {(b, 15) -> a}
+    DenseMap<std::pair<Value*, int64_t>, Value*> canonicalMap; 
+    SmallVector<Instruction*, 8> ToRemove; //memoriziamo le istruzioni da rimuovere.
 
     // Scorriamo ogni BasicBlock e ogni istruzione.
     for (auto &BB : F) {
       for (auto &I : BB) {
         // Consideriamo solo operazioni binarie di addizione e sottrazione.
-        if (!isa<BinaryOperator>(&I))
-          continue;
+        if (!isa<BinaryOperator>(&I)) continue;
         auto *BO = cast<BinaryOperator>(&I);
-        if (BO->getOpcode() != Instruction::Add && BO->getOpcode() != Instruction::Sub)
-          continue;
+        if (BO->getOpcode() != Instruction::Add && BO->getOpcode() != Instruction::Sub) continue;
 
         // Calcoliamo la forma canonica.
         auto canon = getCanonicalForm(BO);
 
-        // Se l'offset risultante è zero e la forma canonica non è l'istruzione stessa,
-        // significa che l'espressione equivale semplicemente alla base.
+        // Se l'offset è zero e la base non è l'istruzione stessa, l'istruzione si può sostituire con la base
         if (canon.second == 0 && canon.first != BO) {
           BO->replaceAllUsesWith(canon.first);
           ToRemove.push_back(BO);
@@ -105,17 +104,17 @@ struct MultiInsOpt : public PassInfoMixin<MultiInsOpt> {
           continue;
         }
 
-        // Se esiste già un'espressione equivalente, sostituiamo questa istruzione con il rappresentante.
-        auto key = canon;
-        if (canonicalMap.count(key)) {
-          Value *rep = canonicalMap[key];
+        // Se esiste già un istruzione con la stessa forma (base, valore), sostituiamo l'istruzione BO con la sua equivalente presente nella canonicalMap.
+        if (canonicalMap.count(canon)) {    //ritorna sempre 0 o 1
+          Value *rep = canonicalMap[canon];
           if (rep != BO) {
             BO->replaceAllUsesWith(rep);
             ToRemove.push_back(BO);
             Changed = true;
           }
+          //Se l'istruzione non è presente nella canonicalMap, la aggiungiamo
         } else {
-          canonicalMap[key] = BO;
+          canonicalMap[canon] = BO;
         }
       }
     }
