@@ -21,7 +21,7 @@ Asgn.so: Asgn.cpp
 
 # 5. Esegui il pass plugin sul file .ll
 ./test/testOpt.ll: ./test/testR.ll Asgn.so
-	opt -load-pass-plugin ./Asgn.so -passes=algebraic-id ./test/testR.ll -o ./test/testOpt.ll
+	opt -load-pass-plugin ./Asgn.so -passes="algebraic-id,strength-red,multi-ins-opt" ./test/testR.ll -o ./test/testOpt.ll
 
 # 6. Disassemble del file ottimizzato dopo il pass plugin
 ./test/testOptR.ll: ./test/testOpt.ll
