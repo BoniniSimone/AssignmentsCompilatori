@@ -5,17 +5,18 @@
 |                         | Dominator Analysis                                |
 |-------------------------|-----------------------------------------------------|
 | **Domain** | Insieme dei nodi appartenenti al CFG |
-| **Direction** | Forward: in[b]  = ⋂ out[pred(b)]; out[b] = fb(in[b]) |
+| **Direction** | Forward: in[b]  = ⋂ out[pred(b)]; out[b] = fb(in[b]) * |
 | **Transfer function** | f_b(x) = {b} ∪ x |
 | **Meet Operation (^)** | ⋂ (Intersezione) |
 | **Boundary Condition** | in[entry] = {entry}  |
 | **Initial interior points** | in[b] = AllNodes (per b ≠ entry);    |
 
+*out[b] = fb(in[b]) (utile a livello implementativo, non logico)
 
 ## Calcolo dei Dominatori – Iterazioni
 
 ### Inizializzazione
-- in[A] = {A} (condizione al contorno)
+- in[A] = {A}
 - in[B] = in[C] = in[D] = in[E] = in[F] = in[G] = {A,B,C,D,E,F,G}
 - out[A] = out[B] = out[C] = out[D] = out[E] = out[F] = out[G] = ∅
 
