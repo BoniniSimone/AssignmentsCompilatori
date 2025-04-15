@@ -5,21 +5,21 @@
 |                         | Very Busy Expression                                |
 |-------------------------|-----------------------------------------------------|
 | **Domain** | Insieme delle espressioni                                        |
-| **Direction** | Backward:                                                     |
-| **Transfer function** |                                                       |
-| **Meet Operation (^)** |                                                      |
-| **Boundary Condition** |                                                      |
-| **Initial interior points** |                                                 |
+| **Direction** | Backwar: <br> in[b] = f<sub>b</sub>(out[b]) <br> out[b] = ^in[succ(b)]        |
+| **Transfer function** | f<sub>b</sub>(x) = Gen<sub>b</sub> $\cup$ ( x - KILL[b] )             |
+| **Meet Operation (^)** | $\cap$                                               |
+| **Boundary Condition** | out[exit] = $\varnothing$                                                  |
+| **Initial interior points** | out[b] = $\varnothing$                          |
 
 ## Tabella 2
 
-|           | Iterazione 1 | Iterazione 2 | Iterazione 3 |
-|-----------|--------------|--------------|--------------|
-| exit      |              |              |              |
-| BB7       |              |              |              |
-| BB6       |              |              |              |
-| BB5       |              |              |              |
-| BB4       |              |              |              |
-| BB3       |              |              |              |
-| BB2       |              |              |              |
-| Entry     |              |              |              |
+|           | Iterazione 1  |
+|-----------|---------------|
+| exit      | in[BB8] = $\varnothing$ <br> out[BB8] = $\varnothing$           |
+| BB7       | in[BB7] = (a-b) <br> out[BB7] = $\varnothing$            |
+| BB6       | in[BB6] = $\varnothing$ <br> out[BB6] = (a-b)             |
+| BB5       | in[BB5] = (b-a) <br> out[BB5] = $\varnothing$             |
+| BB4       | in[BB4] = (a-b) <br> out[BB4] = $\varnothing$             |
+| BB3       | in[BB3] = (b-a),(a-b) <br> out[BB3] = (a-b)             |
+| BB2       | in[BB2] = (b-a) <br> out[BB2] = (b-a)              |
+| Entry     | in[BB1] = (b-a) <br> out[BB1] = (b-a)              |
