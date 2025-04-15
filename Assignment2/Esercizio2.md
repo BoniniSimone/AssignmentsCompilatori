@@ -9,7 +9,7 @@
 | **Transfer function** | f_b(x) = {b} ∪ x |
 | **Meet Operation (^)** | ⋂ (Intersezione) |
 | **Boundary Condition** | in[entry] = {entry}  |
-| **Initial interior points** | in[b] = AllNodes (per b ≠ entry); out[b] = ∅ (inizializzazione, non usata direttamente)    |
+| **Initial interior points** | in[b] = AllNodes (per b ≠ entry);    |
 
 
 ## Calcolo dei Dominatori – Iterazioni
