@@ -6,6 +6,6 @@ opt -passes=mem2reg test.ll -o test.m2r.ll
 
 # Pass + ottimizzazione
 
-clang++ -fPIC -shared -o licmPass.so licmPass.cc `llvm-config --cxxflags --ldflags --libs core` -std=c++17
+clang++ -fPIC -shared -o licmPass.so licmPass.cc \`llvm-config --cxxflags --ldflags --libs core` -std=c++17
 
 opt -load-pass-plugin ./loopCodeMotion.so -passes=licm-pass test.m2r.ll -o test.opt.ll
