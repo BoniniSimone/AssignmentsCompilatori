@@ -1,4 +1,4 @@
-#cerare IR
+# Creare IR
 
 ```bash
 clang -Xclang -disable-O0-optnone -emit-llvm -S -c loopf.c -o loopfLS.ll
