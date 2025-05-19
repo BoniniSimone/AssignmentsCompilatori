@@ -12,5 +12,11 @@ export PATH=$LLVM_DIR:$PATH
 
 ```bash
 clang -Xclang -disable-O0-optnone -emit-llvm -S -c loopf.c -o loopfLS.ll
-opt -p mem2reg loopfLS.ll -o loopfSenzaLS.ll
+opt -p mem2reg loopfLS.ll -So loopfSenzaLS.ll
+```
+
+# Genera passo
+
+```bash
+clang++ -fPIC -shared -o LoopFusion.so LoopFusion.cpp `llvm-config --cxxflags --ldflags --libs core` -std=c++17
 ```
