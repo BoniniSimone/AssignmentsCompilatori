@@ -19,8 +19,4 @@ opt -p mem2reg loopfLS.ll -So loopfSenzaLS.ll
 
 ```bash
 clang++ -fPIC -shared -o LoopFusion.so LoopFusion.cpp `llvm-config --cxxflags --ldflags --libs core` -std=c++17
-<<<<<<< HEAD
 ```
-=======
-```
->>>>>>> fd9ce00cc01403cc3fd4a26be280ee2f02df7bad
