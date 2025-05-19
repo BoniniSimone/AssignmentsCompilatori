@@ -40,7 +40,7 @@
       //Preheader di L1
       BasicBlock *Prehdr1 = L1->getLoopPreheader();
 
-      /*
+      
       // --- Stampa exit block di loop0 ---
       if (Exits0.empty()) {
         errs() << "Loop0 non ha exit-block!\n";
@@ -59,8 +59,6 @@
         Prehdr1->print(errs());
         errs() << "\n";
       }
-      */
-
       
       bool direct = false;
       for (BasicBlock *E : Exits0) {
@@ -70,8 +68,20 @@
         }
       }
 
+      BasicBlock *Exit0 = Exits0[0];
+      bool cleanExit = true;
+      for (Instruction &I : *Exit0) {
+        if (&I == Exit0->getTerminator()) 
+          continue;  // il br finale va bene
+        if (isa<PHINode>(&I))
+          continue;  // (raramente compare qui, ma è safe)
+        // TUTTE le altre istruzioni (call, store, etc.) significano “lavoro”
+        cleanExit = false;
+        break;
+      }
+
       //Stampa risultato
-      if (direct)
+      if (direct && cleanExit)
         errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia)\n";
       else
         errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie\n";

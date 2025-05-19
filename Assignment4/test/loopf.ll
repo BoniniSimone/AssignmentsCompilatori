@@ -1,10 +1,11 @@
-; ModuleID = 'loopf.c'
-source_filename = "loopf.c"
+; ModuleID = './test/loopf.c'
+source_filename = "./test/loopf.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
 
 @__const.loop.b = private unnamed_addr constant [10 x i32] [i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10], align 16
 @__const.loop.c = private unnamed_addr constant [10 x i32] [i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10], align 16
+@.str = private unnamed_addr constant [13 x i8] c"Hello World\0A\00", align 1
 
 ; Function Attrs: noinline nounwind uwtable
 define dso_local void @loop() #0 {
@@ -47,41 +48,45 @@ define dso_local void @loop() #0 {
   br label %7, !llvm.loop !6
 
 26:                                               ; preds = %7
+  %27 = call i32 (ptr, ...) @printf(ptr noundef @.str)
   store i32 0, ptr %6, align 4
-  br label %27
+  br label %28
 
-27:                                               ; preds = %39, %26
-  %28 = load i32, ptr %6, align 4
-  %29 = icmp slt i32 %28, 10
-  br i1 %29, label %30, label %42
+28:                                               ; preds = %40, %26
+  %29 = load i32, ptr %6, align 4
+  %30 = icmp slt i32 %29, 10
+  br i1 %30, label %31, label %43
 
-30:                                               ; preds = %27
-  %31 = load i32, ptr %6, align 4
-  %32 = sext i32 %31 to i64
-  %33 = getelementptr inbounds [10 x i32], ptr %1, i64 0, i64 %32
-  %34 = load i32, ptr %33, align 4
-  %35 = add nsw i32 %34, 1
-  %36 = load i32, ptr %6, align 4
-  %37 = sext i32 %36 to i64
-  %38 = getelementptr inbounds [10 x i32], ptr %4, i64 0, i64 %37
-  store i32 %35, ptr %38, align 4
-  br label %39
+31:                                               ; preds = %28
+  %32 = load i32, ptr %6, align 4
+  %33 = sext i32 %32 to i64
+  %34 = getelementptr inbounds [10 x i32], ptr %1, i64 0, i64 %33
+  %35 = load i32, ptr %34, align 4
+  %36 = add nsw i32 %35, 1
+  %37 = load i32, ptr %6, align 4
+  %38 = sext i32 %37 to i64
+  %39 = getelementptr inbounds [10 x i32], ptr %4, i64 0, i64 %38
+  store i32 %36, ptr %39, align 4
+  br label %40
 
-39:                                               ; preds = %30
-  %40 = load i32, ptr %6, align 4
-  %41 = add nsw i32 %40, 1
-  store i32 %41, ptr %6, align 4
-  br label %27, !llvm.loop !8
+40:                                               ; preds = %31
+  %41 = load i32, ptr %6, align 4
+  %42 = add nsw i32 %41, 1
+  store i32 %42, ptr %6, align 4
+  br label %28, !llvm.loop !8
 
-42:                                               ; preds = %27
+43:                                               ; preds = %28
   ret void
 }
 
 ; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #1
 
+declare i32 @printf(ptr noundef, ...) #2
+
 attributes #0 = { noinline nounwind uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 
 !llvm.module.flags = !{!0, !1, !2, !3, !4}
 !llvm.ident = !{!5}
