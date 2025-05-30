@@ -12,14 +12,14 @@ void loop(int argc){
         do{
             a[i] = b[i] + c[i];
             i++;
-        }while(i<10);
+        }while(i<argc);
     }
     
     if(argc > 0){
         do{
             a[j] = b[j] + c[j];
             j++;
-        }while(j<10);
+        }while(j<argc);
     }
     
 }

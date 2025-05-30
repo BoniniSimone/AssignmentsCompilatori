@@ -9,6 +9,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/PostDominators.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 
 using namespace llvm;
 
@@ -75,6 +77,20 @@ bool guardConditionEq(Loop *L0, Loop *L1) {
   return false;
 }
 
+//Funzione che controlla con la Scalar Evolution (SCEV) se i due loop hanno lo stesso numero di iterazioni
+bool SCEVCheck(Loop *L0, Loop *L1, ScalarEvolution &SE) {
+  const SCEV *BECount0 = SE.getBackedgeTakenCount(L0);  //const SCEV -> contiene l'espressione che indica quante volte verrà eseguito il loop
+  const SCEV *BECount1 = SE.getBackedgeTakenCount(L1);  //meglio di getSmallConstantTakenCount che restituisce un intero se il numero di iterazioni è costante, altrimenti non torna nulla
+  if (isa<SCEVCouldNotCompute>(BECount0) || isa<SCEVCouldNotCompute>(BECount1))
+  {
+    errs() << "SCEV non può calcolare il numero di iterazioni per uno dei loop\n";
+    return false; // Se SCEV non può calcolare il numero di iterazioni, ritorniamo false
+  }
+
+  if (BECount0 == BECount1)  return true;
+  return false;
+}
+
 namespace {
 
 struct LoopFusion : PassInfoMixin<LoopFusion> {
@@ -83,6 +99,7 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
     DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
     PostDominatorTree &PDT = AM.getResult<PostDominatorTreeAnalysis>(F);
     LoopInfo &LI = AM.getResult<LoopAnalysis>(F);
+    ScalarEvolution &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
 
     //Raccogliamo tutti i loop in ordine sequenziale
     SmallVector<Loop*,8> AllLoops = collectLoopsInFunction(F, LI);
@@ -137,6 +154,12 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
           else
             errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno lo stesso control flow\n";
 
+          if(SCEVCheck(L0, L1, SE)) {
+            errs() << "I loop hanno lo stesso numero di iterazioni\n";
+          } else {
+            errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+          }
+
           break;
 
 
@@ -162,6 +185,12 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
             errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stessa condizione di guardia)\n";
           } else {
             errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno la stessa condizione di guardia\n";
+          }
+
+          if(SCEVCheck(L0, L1, SE)) {
+            errs() << "I loop hanno lo stesso numero di iterazioni\n";
+          } else {
+            errs() << "I loop non hanno lo stesso numero di iterazioni\n";
           }
           
           return PreservedAnalyses::all();

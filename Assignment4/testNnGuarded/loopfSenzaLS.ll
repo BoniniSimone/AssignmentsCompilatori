@@ -12,7 +12,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
 
 2:                                                ; preds = %6, %1
   %.01 = phi i32 [ 0, %1 ], [ %7, %6 ]
-  %3 = icmp slt i32 %.01, 10
+  %3 = icmp slt i32 %.01, 1
   br i1 %3, label %4, label %8
 
 4:                                                ; preds = %2
@@ -28,7 +28,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
 
 9:                                                ; preds = %13, %8
   %.0 = phi i32 [ 0, %8 ], [ %14, %13 ]
-  %10 = icmp slt i32 %.0, 10
+  %10 = icmp slt i32 %.0, 1
   br i1 %10, label %11, label %15
 
 11:                                               ; preds = %9

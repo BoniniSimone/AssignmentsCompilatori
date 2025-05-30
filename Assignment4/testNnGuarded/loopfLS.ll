@@ -11,47 +11,51 @@ define dso_local void @loop(i32 noundef %0) #0 {
   %2 = alloca i32, align 4
   %3 = alloca i32, align 4
   %4 = alloca i32, align 4
+  %5 = alloca i32, align 4
   store i32 %0, ptr %2, align 4
-  store i32 0, ptr %3, align 4
-  br label %5
-
-5:                                                ; preds = %11, %1
-  %6 = load i32, ptr %3, align 4
-  %7 = icmp slt i32 %6, 10
-  br i1 %7, label %8, label %14
-
-8:                                                ; preds = %5
-  %9 = load i32, ptr %3, align 4
-  %10 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %9)
-  br label %11
-
-11:                                               ; preds = %8
-  %12 = load i32, ptr %3, align 4
-  %13 = add nsw i32 %12, 1
-  store i32 %13, ptr %3, align 4
-  br label %5, !llvm.loop !6
-
-14:                                               ; preds = %5
+  store i32 1, ptr %3, align 4
   store i32 0, ptr %4, align 4
-  br label %15
+  br label %6
 
-15:                                               ; preds = %21, %14
-  %16 = load i32, ptr %4, align 4
-  %17 = icmp slt i32 %16, 10
-  br i1 %17, label %18, label %24
+6:                                                ; preds = %13, %1
+  %7 = load i32, ptr %4, align 4
+  %8 = load i32, ptr %3, align 4
+  %9 = icmp slt i32 %7, %8
+  br i1 %9, label %10, label %16
 
-18:                                               ; preds = %15
-  %19 = load i32, ptr %4, align 4
-  %20 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %19)
-  br label %21
+10:                                               ; preds = %6
+  %11 = load i32, ptr %4, align 4
+  %12 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %11)
+  br label %13
 
-21:                                               ; preds = %18
-  %22 = load i32, ptr %4, align 4
-  %23 = add nsw i32 %22, 1
-  store i32 %23, ptr %4, align 4
-  br label %15, !llvm.loop !8
+13:                                               ; preds = %10
+  %14 = load i32, ptr %4, align 4
+  %15 = add nsw i32 %14, 1
+  store i32 %15, ptr %4, align 4
+  br label %6, !llvm.loop !6
 
-24:                                               ; preds = %15
+16:                                               ; preds = %6
+  store i32 0, ptr %5, align 4
+  br label %17
+
+17:                                               ; preds = %24, %16
+  %18 = load i32, ptr %5, align 4
+  %19 = load i32, ptr %3, align 4
+  %20 = icmp slt i32 %18, %19
+  br i1 %20, label %21, label %27
+
+21:                                               ; preds = %17
+  %22 = load i32, ptr %5, align 4
+  %23 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %22)
+  br label %24
+
+24:                                               ; preds = %21
+  %25 = load i32, ptr %5, align 4
+  %26 = add nsw i32 %25, 1
+  store i32 %26, ptr %5, align 4
+  br label %17, !llvm.loop !8
+
+27:                                               ; preds = %17
   ret void
 }
 
