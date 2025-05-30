@@ -22,7 +22,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
   store i32 0, ptr %7, align 4
   store i32 0, ptr %8, align 4
   %9 = load i32, ptr %2, align 4
-  %10 = icmp sgt i32 %9, 0
+  %10 = icmp sgt i32 %9, 1
   br i1 %10, label %11, label %31
 
 11:                                               ; preds = %1

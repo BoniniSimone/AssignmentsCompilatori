@@ -14,7 +14,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
   %4 = alloca [10 x i32], align 16
   call void @llvm.memcpy.p0.p0.i64(ptr align 16 %3, ptr align 16 @__const.loop.b, i64 40, i1 false)
   call void @llvm.memcpy.p0.p0.i64(ptr align 16 %4, ptr align 16 @__const.loop.c, i64 40, i1 false)
-  %5 = icmp sgt i32 %0, 0
+  %5 = icmp sgt i32 %0, 1
   br i1 %5, label %6, label %21
 
 6:                                                ; preds = %1
