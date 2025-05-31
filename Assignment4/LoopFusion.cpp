@@ -11,6 +11,7 @@
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/DependenceAnalysis.h"
 
 using namespace llvm;
 
@@ -91,6 +92,38 @@ bool SCEVCheck(Loop *L0, Loop *L1, ScalarEvolution &SE) {
   return false;
 }
 
+//Funzione che controlla se ci sono dipendenze tra le istruzioni di loop1 con istruzioni di loop1
+bool hasDependence(Loop *L0, Loop *L1, DependenceInfo &DI) {
+  SmallVector<Instruction *, 8> LSInsts0; // Load/Store instructions in loop0
+  SmallVector<Instruction *, 8> LSInsts1; // Load/Store instructions in loop1
+
+  for (BasicBlock *BB : L0->getBlocks()) {
+    for (Instruction &I : *BB) {
+      if (isa<LoadInst>(&I) || isa<StoreInst>(&I)) {
+        LSInsts0.push_back(&I);
+      }
+    }
+  }
+
+  for (BasicBlock *BB : L1->getBlocks()) {
+    for (Instruction &I : *BB) {
+      if (isa<LoadInst>(&I) || isa<StoreInst>(&I)) {
+        LSInsts1.push_back(&I);
+      }
+    }
+  }
+
+  for (Instruction *I0 : LSInsts0) {
+    for (Instruction *I1 : LSInsts1) {
+      if (DI.depends(I0, I1, true)) {
+        errs() << "Dipendenza trovata tra " << *I0 << " e " << *I1 << "\n";
+        return true; 
+      }
+    }
+  }
+  return false; 
+}
+
 namespace {
 
 struct LoopFusion : PassInfoMixin<LoopFusion> {
@@ -100,6 +133,7 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
     PostDominatorTree &PDT = AM.getResult<PostDominatorTreeAnalysis>(F);
     LoopInfo &LI = AM.getResult<LoopAnalysis>(F);
     ScalarEvolution &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
+    DependenceInfo&DI = AM.getResult<DependenceAnalysis>(F);
 
     //Raccogliamo tutti i loop in ordine sequenziale
     SmallVector<Loop*,8> AllLoops = collectLoopsInFunction(F, LI);
@@ -160,6 +194,12 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
             errs() << "I loop non hanno lo stesso numero di iterazioni\n";
           }
 
+          if(hasDependence(L0, L1, DI)) {
+            errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+          } else {
+            errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
+          }
+
           break;
 
 
@@ -191,6 +231,12 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
             errs() << "I loop hanno lo stesso numero di iterazioni\n";
           } else {
             errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+          }
+
+          if(hasDependence(L0, L1, DI)) {
+            errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+          } else {
+            errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
           }
           
           return PreservedAnalyses::all();
