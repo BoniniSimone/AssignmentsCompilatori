@@ -16,7 +16,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
 3:                                                ; preds = %13, %1
   %.01 = phi i32 [ 0, %1 ], [ %14, %13 ]
   %4 = icmp slt i32 %.01, 3
-  br i1 %4, label %5, label %15
+  br i1 %4, label %5, label %17
 
 5:                                                ; preds = %3
   %6 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %.01)
@@ -27,29 +27,17 @@ define dso_local void @loop(i32 noundef %0) #0 {
   %11 = sext i32 %.01 to i64
   %12 = getelementptr inbounds [3 x i32], ptr %2, i64 0, i64 %11
   store i32 %10, ptr %12, align 4
-  br label %13
+  br label %15
 
-13:                                               ; preds = %5
+13:                                               ; preds = %15
   %14 = add nsw i32 %.01, 1
   br label %3, !llvm.loop !6
 
-15:                                               ; preds = %3
-  br label %16
+15:                                               ; preds = %5
+  %16 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %.01)
+  br label %13
 
-16:                                               ; preds = %20, %15
-  %.0 = phi i32 [ 0, %15 ], [ %21, %20 ]
-  %17 = icmp slt i32 %.0, 3
-  br i1 %17, label %18, label %22
-
-18:                                               ; preds = %16
-  %19 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %.0)
-  br label %20
-
-20:                                               ; preds = %18
-  %21 = add nsw i32 %.0, 1
-  br label %16, !llvm.loop !8
-
-22:                                               ; preds = %16
+17:                                               ; preds = %3
   ret void
 }
 
@@ -73,4 +61,3 @@ attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protect
 !5 = !{!"Ubuntu clang version 19.1.7 (++20250114103320+cd708029e0b2-1~exp1~20250114103432.75)"}
 !6 = distinct !{!6, !7}
 !7 = !{!"llvm.loop.mustprogress"}
-!8 = distinct !{!8, !7}

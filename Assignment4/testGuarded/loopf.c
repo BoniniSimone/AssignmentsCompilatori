@@ -17,7 +17,7 @@ void loop(int argc){
     
     if(argc > 0){
         do{
-            a[j] = b[j] + c[j];
+            printf("Hello World\n");
             j++;
         }while(j<argc);
     }

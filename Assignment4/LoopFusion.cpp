@@ -7,11 +7,11 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/IR/Dominators.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/DependenceAnalysis.h"
+
 
 using namespace llvm;
 
@@ -124,6 +124,146 @@ bool hasDependence(Loop *L0, Loop *L1, DependenceInfo &DI) {
   return false; 
 }
 
+//Funzione che restituisce il blocco body di un loop
+BasicBlock *getLoopBody(Loop *L) {
+  BasicBlock *Header   = L->getHeader();
+  BasicBlock *Latch = L->getLoopLatch();
+  BasicBlock *Body  = nullptr;
+
+  for (BasicBlock *Succ : successors(Header)) {
+    if (!L->contains(Succ))
+      continue; 
+
+    if (Succ == Latch) //Se l'header ha come successore il latch, allora il body è l'header (caso dei loop guarded)
+      Body = Header;
+    else 
+      Body = Succ;
+    break;
+  }
+
+  assert(Body && "Body non trovato");
+  return Body;
+}
+
+//Funzione che fonde i loop NON Guarded
+void fuseLoops(Loop *L0, Loop *L1, Function &F, LoopInfo &LI) {
+
+  BasicBlock *L0Body = getLoopBody(L0);
+  BasicBlock *L1Body = getLoopBody(L1);
+ 
+  // 1) Sostiuiamo tutti gli IV (Induction Variables) di L1 con quelli di L0
+
+  PHINode *PhiI0 = L0->getCanonicalInductionVariable();
+  PHINode *PhiI1 = L1->getCanonicalInductionVariable();
+
+  PhiI1->replaceAllUsesWith(PhiI0); //non cancella PhiI1 in sé, ma semplicemente reindirizza tutti gli “usi” (uses) verso PhiI0.
+  PhiI1->eraseFromParent();  //Cnacella la phi di %i1
+
+  BasicBlock *L1Pre   = L1->getLoopPreheader();
+  BasicBlock *L1Hdr   = L1->getHeader();
+  BasicBlock *L1Latch = L1->getLoopLatch();
+  BasicBlock *L1Exit  = L1->getExitBlock();
+
+  // 2) Branch da L0Body → L1Body e da L1Body → L0Latch
+
+  Instruction *T0 = L0Body->getTerminator();
+  T0->eraseFromParent();                   
+  BranchInst::Create(L1Body, L0Body);      
+  
+  Instruction *T1 = L1Body->getTerminator();
+  T1->eraseFromParent();                  
+  BasicBlock *L0Latch = L0->getLoopLatch();
+  BranchInst::Create(L0Latch, L1Body);     
+
+  // 3) Branch da L0Header → L1Exit
+  
+  Instruction *THeader0 = L0->getHeader()->getTerminator();
+  for (int i=0; i < THeader0->getNumSuccessors(); i++) {
+    if (THeader0->getSuccessor(i) == L1Pre) { 
+      THeader0->setSuccessor(i, L1Exit); 
+      break;
+    }
+  }
+
+  // 4) Cancelliamo Preheader, Header e Latch di L1
+  
+  L1Pre->eraseFromParent();  
+  L1Hdr->eraseFromParent();  
+  L1Latch->eraseFromParent(); 
+  
+}
+
+void fuseLoopsGuarded(Loop *L0, Loop *L1, Function &F, LoopInfo &LI) {
+
+  BasicBlock *L0Preheader = L0->getLoopPreheader(); 
+  BasicBlock *L0Header    = L0->getHeader();        
+  BasicBlock *L0Latch     = L0->getLoopLatch();     
+  BasicBlock *L0Exit      = L0->getExitBlock();     
+
+  BasicBlock *L1Preheader = L1->getLoopPreheader(); 
+  BasicBlock *L1Header    = L1->getHeader();        
+  BasicBlock *L1Latch     = L1->getLoopLatch();     
+  BasicBlock *L1Exit      = L1->getExitBlock();     
+
+  // 1) Trovare e sostituire le PHI di L1 con quelle di L0
+
+  PHINode *PhiI0 = L0->getCanonicalInductionVariable();
+  PHINode *PhiI1 = L1->getCanonicalInductionVariable();
+
+  PhiI1->replaceAllUsesWith(PhiI0);
+  PhiI1->eraseFromParent();
+
+
+  // 2) Reindirizziamo L0Latch verso L1Exit
+
+  Instruction *TLatch0 = L0Latch->getTerminator();
+  for (int i = 0; i < TLatch0->getNumSuccessors(); ++i) {
+    if (TLatch0->getSuccessor(i) == L0Exit) {
+      TLatch0->setSuccessor(i, L1Exit);
+      break;
+    }
+  }
+  
+
+  // 3) Branch da L0Header → L1Header e da L1Header → L0Latch
+
+  Instruction *T0 = L0Header->getTerminator();
+  T0->eraseFromParent();
+  BranchInst::Create(L1Header, L0Header);
+
+  Instruction *T1 = L1Header->getTerminator();
+  T1->eraseFromParent();
+  BranchInst::Create(L0Latch, L1Header); 
+
+
+  // 4) Cancelliamo L1Preheader 
+  //Ridirezioniamo tutti i predecessori a L1Exit (cioè rindiriziamo Guard1)
+
+  for (BasicBlock *Pred : predecessors(L1Preheader)) {
+    Instruction *BI = dyn_cast<BranchInst>(Pred->getTerminator());
+    for (int i = 0; i < BI->getNumSuccessors(); ++i) {
+      if (BI->getSuccessor(i) == L1Preheader) {
+        BI->setSuccessor(i, L1Exit);
+      }
+    }
+  }
+  
+  L1Preheader->eraseFromParent();
+  
+
+  // 5) Cancelliamo L1Latch (block 27):
+  //Aveva come predecessore L1Header, che ora punta a L0Latch (vedere punto 4), quindi non ha più predecessori e possiamo eliminarlo senza agire sui predecessori.
+  
+  L1Latch->eraseFromParent();
+
+  // 6) Cancelliamo L0Exit (block 20):
+  // L0Exit aveva come predecessore L0Latch, che ora punta a L1Exit (vedere punto 3), quindi non ha più predecessorie possimao eliminarlo senza agire sui predecessori.
+  
+  L0Exit->eraseFromParent();
+  
+
+}
+
 namespace {
 
 struct LoopFusion : PassInfoMixin<LoopFusion> {
@@ -183,23 +323,26 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
           controlFlow=controlFlowEq(L0, L1, DT, PDT); //Controlliamo se i due loop hanno lo stesso control flow
           
           //Stampa risultato
-          if (direct && cleanExit && controlFlow) 
+          if (direct && cleanExit && controlFlow){
             errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stesso control flow)\n";
+            if(SCEVCheck(L0, L1, SE)) {
+              errs() << "I loop hanno lo stesso numero di iterazioni\n";
+              if(hasDependence(L0, L1, DI)) {
+              errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+            } else {
+              errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
+              fuseLoops(L0, L1, F, LI); //Fusione dei loop
+              errs() << "Fusione dei loop completata con successo\n";
+              return PreservedAnalyses::none();
+            }
+            } else {
+              errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+            }
+          }
           else
             errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno lo stesso control flow\n";
 
-          if(SCEVCheck(L0, L1, SE)) {
-            errs() << "I loop hanno lo stesso numero di iterazioni\n";
-          } else {
-            errs() << "I loop non hanno lo stesso numero di iterazioni\n";
-          }
-
-          if(hasDependence(L0, L1, DI)) {
-            errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
-          } else {
-            errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
-          }
-
+          
           break;
 
 
@@ -223,21 +366,23 @@ struct LoopFusion : PassInfoMixin<LoopFusion> {
         
           if (direct && cleanSuccessor && sameGuardCond) {
             errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stessa condizione di guardia)\n";
+            if(SCEVCheck(L0, L1, SE)) {
+              errs() << "I loop hanno lo stesso numero di iterazioni\n";
+              if(hasDependence(L0, L1, DI)) {
+                errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+              } else {
+                errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
+                fuseLoopsGuarded(L0, L1, F, LI); //Fusione dei loop
+                errs() << "Fusione dei loop completata con successo\n";
+                return PreservedAnalyses::none();
+              }
+            } else {
+              errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+            }
           } else {
             errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno la stessa condizione di guardia\n";
           }
-
-          if(SCEVCheck(L0, L1, SE)) {
-            errs() << "I loop hanno lo stesso numero di iterazioni\n";
-          } else {
-            errs() << "I loop non hanno lo stesso numero di iterazioni\n";
-          }
-
-          if(hasDependence(L0, L1, DI)) {
-            errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
-          } else {
-            errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
-          }
+          
           
           return PreservedAnalyses::all();
       }

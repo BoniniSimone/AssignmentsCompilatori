@@ -20,3 +20,9 @@ opt -p mem2reg loopfLS.ll -So loopfSenzaLS.ll
 ```bash
 clang++ -fPIC -shared -o LoopFusion.so LoopFusion.cpp `llvm-config --cxxflags --ldflags --libs core` -std=c++17
 ```
+
+# Esegui passo
+
+```bash
+opt -load-pass-plugin ./LoopFusion.so -passes=fusion-pass ./testNnGuarded/loopfSenzaLS.ll -So FINE.ll
+```
