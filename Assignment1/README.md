@@ -2,11 +2,16 @@
 
 # Indice
 
+- [Assignments](#assignments)
+- [Indice](#indice)
 - [Configurazione enviroment](#configurazione-enviroment)
 - [Ricavare l'IR](#ricavare-lir)
 - [Compilare Asgn.cpp](#compilare-asgncpp)
-- [Ottimizzare](#ottimizzare)
+- [Ottimizzare:](#ottimizzare)
 - [Assignment 1](#assignment-1)
+    - [1. Algebraic Identity](#1-algebraic-identity)
+    - [2. Strength Reduction (più avanzato)](#2-strength-reduction-più-avanzato)
+    - [3. Multi-Instruction Optimization](#3-multi-instruction-optimization)
 
 # Configurazione enviroment
 Potrebbe essere che il nostro ambiente non sia confiugurato correttamente per eseguire i comandi di llvm-19.
@@ -27,10 +32,10 @@ clang -Xclang -disable-O0-optnone -emit-llvm -S -c <nome>.c -o <nome>.ll
 ```
 Le ottimizzazioni normali hanno molte load e store, che non ci aiutano per rimuoverle eseguire anche questo comando:
 ```bash
-opt -p mem2reg <nomeIR>.ll -o <nomeIRsenzaLoad>.ll
+opt -p mem2reg <nomeIR>.ll -So <nomeIRsenzaLoad>.ll
 ```
 ---
-*Se proviamo a leggere il file notiamo che non è leggibile perchè è in bitecode binario. Per renderlo leggibile eseguire il seguente comando:*
+*Se un file non dovesse essere leggibile perchè è in bitecode binario. Per renderlo leggibile eseguire il seguente comando:*
 ```bash
 llvm-dis <fileNonLeggibile>.ll -o <leggibile>.ll
 ```
@@ -46,22 +51,22 @@ clang++ -fPIC -shared -o <nome>.so <nome>.cpp `llvm-config --cxxflags --ldflags 
 # Ottimizzare:
 Algebraic Identity:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=algebraic-id <nome>.ll -o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=algebraic-id <nome>.ll -So <nome>.ll
 ```
 
 Strength Reduction:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=strength-red <nome>.ll -o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=strength-red <nome>.ll -So <nome>.ll
 ```
 
 Multi-Instruction Optimization:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll -o <nome>.ll
+opt -load-pass-plugin ./Asgn.so -passes=multi-ins-opt <nome>.ll -So <nome>.ll
 ```
 
 Tutti i passi insieme:
 ```bash
-opt -load-pass-plugin ./Asgn.so -passes="algebraic-id,strength-red,multi-ins-opt" ./test/testR.ll -o ./test/testOpt.ll
+opt -load-pass-plugin ./Asgn.so -passes="algebraic-id,strength-red,multi-ins-opt" ./test/testR.ll -So ./test/testOpt.ll
 ```
 
 
