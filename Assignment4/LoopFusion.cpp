@@ -145,6 +145,17 @@ BasicBlock *getLoopBody(Loop *L) {
   return Body;
 }
 
+//Funzione che percmette di unire i body di più di due loop
+void moreLoop(BasicBlock *L1Body, BasicBlock *L0Body, BasicBlock *L0Latch) {
+  Instruction *T0 = L0Body->getTerminator(); 
+  if (T0->getSuccessor(0) == L0Latch) { 
+    T0->eraseFromParent();                   
+    BranchInst::Create(L1Body, L0Body); 
+  } else {
+    moreLoop( L1Body, T0->getSuccessor(0), L0Latch); 
+  }
+}
+
 //Funzione che fonde i loop NON Guarded
 void fuseLoops(Loop *L0, Loop *L1, Function &F, LoopInfo &LI) {
 
@@ -164,15 +175,16 @@ void fuseLoops(Loop *L0, Loop *L1, Function &F, LoopInfo &LI) {
   BasicBlock *L1Latch = L1->getLoopLatch();
   BasicBlock *L1Exit  = L1->getExitBlock();
 
+  BasicBlock *L0Latch = L0->getLoopLatch(); 
+
   // 2) Branch da L0Body → L1Body e da L1Body → L0Latch
 
-  Instruction *T0 = L0Body->getTerminator();
-  T0->eraseFromParent();                   
-  BranchInst::Create(L1Body, L0Body);      
+  
+  moreLoop(L1Body, L0Body, L0Latch); 
+  
   
   Instruction *T1 = L1Body->getTerminator();
   T1->eraseFromParent();                  
-  BasicBlock *L0Latch = L0->getLoopLatch();
   BranchInst::Create(L0Latch, L1Body);     
 
   // 3) Branch da L0Header → L1Exit
@@ -227,9 +239,7 @@ void fuseLoopsGuarded(Loop *L0, Loop *L1, Function &F, LoopInfo &LI) {
 
   // 3) Branch da L0Header → L1Header e da L1Header → L0Latch
 
-  Instruction *T0 = L0Header->getTerminator();
-  T0->eraseFromParent();
-  BranchInst::Create(L1Header, L0Header);
+  moreLoop(L1Header, L0Header, L0Latch); 
 
   Instruction *T1 = L1Header->getTerminator();
   T1->eraseFromParent();
@@ -269,127 +279,144 @@ namespace {
 struct LoopFusion : PassInfoMixin<LoopFusion> {
 
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM) {
-    DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
-    PostDominatorTree &PDT = AM.getResult<PostDominatorTreeAnalysis>(F);
-    LoopInfo &LI = AM.getResult<LoopAnalysis>(F);
-    ScalarEvolution &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
-    DependenceInfo&DI = AM.getResult<DependenceAnalysis>(F);
+    bool anyFuision = false;
 
-    //Raccogliamo tutti i loop in ordine sequenziale
-    SmallVector<Loop*,8> AllLoops = collectLoopsInFunction(F, LI);
+    while(true){
 
-    //Se ce ne sono almeno 2
-    if (AllLoops.size() >= 2) {
-      Loop *L0 = AllLoops[0];
-      Loop *L1 = AllLoops[1];
+      bool fusedThisRound = false;
 
-      //Exit-blocks di L0
-      SmallVector<BasicBlock*,4> Exits0;
-      L0->getExitBlocks(Exits0);
+      DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
+      PostDominatorTree &PDT = AM.getResult<PostDominatorTreeAnalysis>(F);
+      LoopInfo &LI = AM.getResult<LoopAnalysis>(F);
+      ScalarEvolution &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
+      DependenceInfo&DI = AM.getResult<DependenceAnalysis>(F);
 
-      //Preheader di L1
-      BasicBlock *Prehdr1 = L1->getLoopPreheader();
+      //Raccogliamo tutti i loop in ordine sequenziale
+      SmallVector<Loop*,8> AllLoops = collectLoopsInFunction(F, LI);
 
-
-      bool direct = false;
-      bool cleanExit = false;
-      bool cleanSuccessor = false;
-      bool controlFlow = false;
-      bool sameGuardCond = false;
-      BasicBlock *succ = nullptr;
-      BasicBlock *Exit0 = nullptr;
-
-      switch (guarded(L0, L1)) {
-
-        //----- Solo uno dei due è guarded -----
-        case 0:
-          errs() << "Loop0 e loop1 non si possono fondere, perchè uno è guarded e l'altro no\n";
-          return PreservedAnalyses::all();
-
-
-        //----- Entrambi i loop NON GUARDED -----
-        case 1:
-          errs() << "Loop0 e loop1 non hanno condizioni di guardia, si può fondere\n";
-          
-          for (BasicBlock *E : Exits0) {
-            if(E == Prehdr1) { //Se l'uscita di loop0 è il preheader di loop1
-              direct = true;
-              break;
-            }
-          }
-          
-          Exit0 = Exits0[0];
-          cleanExit = intInstructions(Exit0); //Controlliamo se ci sono istruzioni intermedie tra loop0 e loop1
-          controlFlow=controlFlowEq(L0, L1, DT, PDT); //Controlliamo se i due loop hanno lo stesso control flow
-          
-          //Stampa risultato
-          if (direct && cleanExit && controlFlow){
-            errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stesso control flow)\n";
-            if(SCEVCheck(L0, L1, SE)) {
-              errs() << "I loop hanno lo stesso numero di iterazioni\n";
-              if(hasDependence(L0, L1, DI)) {
-              errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
-            } else {
-              errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
-              fuseLoops(L0, L1, F, LI); //Fusione dei loop
-              errs() << "Fusione dei loop completata con successo\n";
-              return PreservedAnalyses::none();
-            }
-            } else {
-              errs() << "I loop non hanno lo stesso numero di iterazioni\n";
-            }
-          }
-          else
-            errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno lo stesso control flow\n";
-
-          
-          break;
-
-
-        //----- Entrambi i loop sono GUARDED -----
-        case 2:
-          errs() << "Loop0 e loop1 sono entrambi guarded\n";
-          
-          BasicBlock *Successor0 = L0->getLoopGuardBranch()->getSuccessor(0);
-          BasicBlock *Successor1 = L0->getLoopGuardBranch()->getSuccessor(1);
-
-          
-          //Se i loop sono guarded il successore non loop del guard branch di L0 deve essere l’entry block di L1.
-          if(Successor0 == L1->getLoopGuardBranch()->getParent() || Successor1 == L1->getLoopGuardBranch()->getParent()) {
-            direct = true;
-            if(Successor0 == L1->getLoopGuardBranch()->getParent()) succ=Successor0;
-            else succ=Successor1;  
-          } 
-          
-          cleanSuccessor = intInstructions(succ);
-          sameGuardCond=guardConditionEq(L0, L1);
+      //Se ce ne sono almeno 2
+      if (AllLoops.size() >= 2) {
+        for (int i = 0; i+1 < AllLoops.size(); ++i) {
+          Loop *L0 = AllLoops[i];
+          Loop *L1 = AllLoops[i+1];
         
-          if (direct && cleanSuccessor && sameGuardCond) {
-            errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stessa condizione di guardia)\n";
-            if(SCEVCheck(L0, L1, SE)) {
-              errs() << "I loop hanno lo stesso numero di iterazioni\n";
-              if(hasDependence(L0, L1, DI)) {
-                errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
-              } else {
-                errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
-                fuseLoopsGuarded(L0, L1, F, LI); //Fusione dei loop
-                errs() << "Fusione dei loop completata con successo\n";
-                return PreservedAnalyses::none();
+          //Exit-blocks di L0
+          SmallVector<BasicBlock*,4> Exits0;
+          L0->getExitBlocks(Exits0);
+
+          //Preheader di L1
+          BasicBlock *Prehdr1 = L1->getLoopPreheader();
+
+
+          bool direct = false;
+          bool cleanExit = false;
+          bool cleanSuccessor = false;
+          bool controlFlow = false;
+          bool sameGuardCond = false;
+          BasicBlock *succ = nullptr;
+          BasicBlock *Exit0 = nullptr;
+
+          switch (guarded(L0, L1)) {
+
+            //----- Solo uno dei due è guarded -----
+            case 0:
+              errs() << "Loop0 e loop1 non si possono fondere, perchè uno è guarded e l'altro no\n";
+              break;
+
+
+            //----- Entrambi i loop NON GUARDED -----
+            case 1:
+              errs() << "Loop0 e loop1 non hanno condizioni di guardia, si può fondere\n";
+              
+              for (BasicBlock *E : Exits0) {
+                if(E == Prehdr1) { //Se l'uscita di loop0 è il preheader di loop1
+                  direct = true;
+                  break;
+                }
               }
-            } else {
-              errs() << "I loop non hanno lo stesso numero di iterazioni\n";
-            }
-          } else {
-            errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno la stessa condizione di guardia\n";
+              
+              Exit0 = Exits0[0];
+              cleanExit = intInstructions(Exit0); //Controlliamo se ci sono istruzioni intermedie tra loop0 e loop1
+              controlFlow=controlFlowEq(L0, L1, DT, PDT); //Controlliamo se i due loop hanno lo stesso control flow
+              
+              //Stampa risultato
+              if (direct && cleanExit && controlFlow){
+                errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stesso control flow)\n";
+                if(SCEVCheck(L0, L1, SE)) {
+                  errs() << "I loop hanno lo stesso numero di iterazioni\n";
+                  if(hasDependence(L0, L1, DI)) {
+                    errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+                  } 
+                  else {
+                    errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
+                    fuseLoops(L0, L1, F, LI); //Fusione dei loop
+                    errs() << "Fusione dei loop completata con successo\n\n";
+                    fusedThisRound = true;
+                    anyFuision = true;
+                    i++; //Incrementiamo i per saltare il loop successivo, che è stato fuso con questo
+                  }
+                } 
+                else {
+                  errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+                }
+              }
+              
+              break;
+
+
+            //----- Entrambi i loop sono GUARDED -----
+            case 2:
+              errs() << "Loop0 e loop1 sono entrambi guarded\n";
+              
+              BasicBlock *Successor0 = L0->getLoopGuardBranch()->getSuccessor(0);
+              BasicBlock *Successor1 = L0->getLoopGuardBranch()->getSuccessor(1);
+
+              
+              //Se i loop sono guarded il successore non loop del guard branch di L0 deve essere l’entry block di L1.
+              if(Successor0 == L1->getLoopGuardBranch()->getParent() || Successor1 == L1->getLoopGuardBranch()->getParent()) {
+                direct = true;
+                if(Successor0 == L1->getLoopGuardBranch()->getParent()) succ=Successor0;
+                else succ=Successor1;  
+              } 
+              
+              cleanSuccessor = intInstructions(succ);
+              sameGuardCond=guardConditionEq(L0, L1);
+            
+              if (direct && cleanSuccessor && sameGuardCond) {
+                errs() << "Loop0 → loop1 adiacenti (nessuna istruzione intermedia e hanno stessa condizione di guardia)\n";
+                if(SCEVCheck(L0, L1, SE)) {
+                  errs() << "I loop hanno lo stesso numero di iterazioni\n";
+                  if(hasDependence(L0, L1, DI)) {
+                    errs() << "I loop hanno dipendenze tra le loro istruzioni\n";
+                  } else {
+                    errs() << "I loop non hanno dipendenze tra le loro istruzioni\n";
+                    fuseLoopsGuarded(L0, L1, F, LI); //Fusione dei loop
+                    errs() << "Fusione dei loop completata con successo\n\n";
+                    fusedThisRound = true;
+                    anyFuision = true;
+                    i++; //Incrementiamo i per saltare il loop successivo, che è stato fuso con questo
+                  }
+                } else {
+                  errs() << "I loop non hanno lo stesso numero di iterazioni\n";
+                }
+              } else {
+                errs() << "Tra loop0 e loop1 ci sono istruzioni intermedie o non hanno la stessa condizione di guardia\n";
+              }
+              
+              break;
           }
           
-          
-          return PreservedAnalyses::all();
+        }
       }
-      
+    if(!fusedThisRound)
+      break;
+  }
+    if(anyFuision) {
+      return PreservedAnalyses::none();
+    } else {
+      return PreservedAnalyses::all();
     }
-
-    return PreservedAnalyses::all();
+    
   }
 
 

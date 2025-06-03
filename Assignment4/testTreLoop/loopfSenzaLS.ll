@@ -1,4 +1,4 @@
-; ModuleID = './testTreLoop/loopfSenzaLS.ll'
+; ModuleID = 'loopfLS.ll'
 source_filename = "loopf.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
@@ -17,7 +17,7 @@ define dso_local void @loop(i32 noundef %0) #0 {
 3:                                                ; preds = %13, %1
   %.02 = phi i32 [ 0, %1 ], [ %14, %13 ]
   %4 = icmp slt i32 %.02, 3
-  br i1 %4, label %5, label %19
+  br i1 %4, label %5, label %15
 
 5:                                                ; preds = %3
   %6 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %.02)
@@ -28,21 +28,45 @@ define dso_local void @loop(i32 noundef %0) #0 {
   %11 = sext i32 %.02 to i64
   %12 = getelementptr inbounds [3 x i32], ptr %2, i64 0, i64 %11
   store i32 %10, ptr %12, align 4
-  br label %15
+  br label %13
 
-13:                                               ; preds = %17
+13:                                               ; preds = %5
   %14 = add nsw i32 %.02, 1
   br label %3, !llvm.loop !6
 
-15:                                               ; preds = %5
-  %16 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %.02)
-  br label %17
+15:                                               ; preds = %3
+  br label %16
 
-17:                                               ; preds = %15
-  %18 = call i32 (ptr, ...) @printf(ptr noundef @.str.2, i32 noundef %.02)
-  br label %13
+16:                                               ; preds = %20, %15
+  %.01 = phi i32 [ 0, %15 ], [ %21, %20 ]
+  %17 = icmp slt i32 %.01, 3
+  br i1 %17, label %18, label %22
 
-19:                                               ; preds = %3
+18:                                               ; preds = %16
+  %19 = call i32 (ptr, ...) @printf(ptr noundef @.str.1, i32 noundef %.01)
+  br label %20
+
+20:                                               ; preds = %18
+  %21 = add nsw i32 %.01, 1
+  br label %16, !llvm.loop !8
+
+22:                                               ; preds = %16
+  br label %23
+
+23:                                               ; preds = %27, %22
+  %.0 = phi i32 [ 0, %22 ], [ %28, %27 ]
+  %24 = icmp slt i32 %.0, 3
+  br i1 %24, label %25, label %29
+
+25:                                               ; preds = %23
+  %26 = call i32 (ptr, ...) @printf(ptr noundef @.str.2, i32 noundef %.0)
+  br label %27
+
+27:                                               ; preds = %25
+  %28 = add nsw i32 %.0, 1
+  br label %23, !llvm.loop !9
+
+29:                                               ; preds = %23
   ret void
 }
 
@@ -66,3 +90,5 @@ attributes #2 = { "frame-pointer"="all" "no-trapping-math"="true" "stack-protect
 !5 = !{!"Ubuntu clang version 19.1.7 (++20250114103320+cd708029e0b2-1~exp1~20250114103432.75)"}
 !6 = distinct !{!6, !7}
 !7 = !{!"llvm.loop.mustprogress"}
+!8 = distinct !{!8, !7}
+!9 = distinct !{!9, !7}
