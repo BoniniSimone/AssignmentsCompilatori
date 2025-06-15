@@ -1,11 +1,16 @@
 # Compilazione test
 
-clang -Xclang -disable-O0-optnone -emit-llvm -S -c test.cc -o test.ll
-opt -passes=mem2reg test.ll -o test.m2r.ll
+```bash
+clang -Xclang -disable-O0-optnone -emit-llvm -S -c LoopInv.c -o LoopInv.ll
+opt -p mem2reg LoopInv.ll -So LoopInv.ll
+```
 
 
 # Pass + ottimizzazione
 
+```bash
 clang++ -fPIC -shared -o licmPass.so licmPass.cc \`llvm-config --cxxflags --ldflags --libs core` -std=c++17
-
-opt -load-pass-plugin ./loopCodeMotion.so -passes=licm-pass test.m2r.ll -o test.opt.ll
+```
+```bash
+opt -load-pass-plugin ./licmPass.so -passes=licm-pass ./test/LoopInv.ll -o FINE.ll
+```
