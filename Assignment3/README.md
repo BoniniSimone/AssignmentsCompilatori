@@ -12,5 +12,5 @@ opt -p mem2reg LoopInv.ll -So LoopInv.ll
 clang++ -fPIC -shared -o licmPass.so licmPass.cpp `llvm-config --cxxflags --ldflags --libs core` -std=c++17
 ```
 ```bash
-opt -load-pass-plugin ./licmPass.so -passes=licm-pass ./test/LoopInv.ll -o FINE.ll
+opt -load-pass-plugin ./licmPass.so -passes=licm-pass ./test/LoopInv.ll -So FINE.ll
 ```
